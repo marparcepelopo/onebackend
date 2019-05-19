@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # VARIABLES
-BASEDIR="$HOME/one/"
+BASEDIR=${HOME}"/one/"
 CONFIG_FILE=${BASEDIR}"configfile.conf"
 CASE=""
 ALIAS=""
@@ -23,11 +23,12 @@ function show_menu() {
   echo "Choose option:"
   stty echo
   read opt
-  return opt
+  return $opt
   }
 
 function main() {
   clear
+  check_config_loaded
   show_menu
   while :
   do
@@ -35,8 +36,12 @@ function main() {
 
       1) clear
          option_picked "1. Copia de datos"
-         echo "Write the target directory of the copy: \(empty=cancel\)"
-         read targetdir
+         if [ -z "$TARGETDIR" ]; then
+           echo "Write the target directory of the copy: \(empty=cancel\)"
+           read targetdir
+         else
+           targetdir="$TARGETDIR"
+         fi
          check_directory "$targetdir"
          ls ${INCOMINGDIR}/*.E01 >/dev/null 2>&1
          if [ $? -eq 0 ]; then
@@ -80,7 +85,7 @@ function main() {
          elif [ -z "$num" ]; then
            show_menu
          else
-           echo "ERROR: the number is not correct
+           echo "ERROR: the number is not correct"
          fi
          show_menu
          ;;

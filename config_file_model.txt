@@ -1,3 +1,4 @@
 CASE=onebackend
 ALIAS=onebackend_alias
-
+TARGETDIR=/home/marcelo/one/target
+LOGFILE=/home/marcelo/one/logfile.log
