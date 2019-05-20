@@ -76,7 +76,7 @@ do
   fi
 done
 
-log info "Changing permissions to be read and executable by the current user
+log info "Changing permissions to be read and executable by the current user"
 for item in ${sinpermisoarr[@]}
 do
   find $item -exec chmod +rx {} \; 2>/dev/null

@@ -15,14 +15,39 @@ fi
 
 function help() {
   # A short brief help to guide you throught the functionaly of this menu
-  echo "HELP"
-  echo "===="
+  echo "HELP (opcion -h)"
+  echo "================"
   echo
-  echo "The menu has 7 items
+  echo "The menu has 7 items"
+  echo "1. Copia datos"
+  echo " Inicia el proceso de copia de datos de las imagenes en formato EnCase"
+  echo " en segundo plano."
+  echo "2. Carga de fichero de configuracion"
+  echo " Pregunta por donde leer el fichero de configuracion, y hace la carga de dicho fichero"
+  echo " Formato de fichero de configuracion:"
+  echo "  CASE=<valor> (obligatorio)"
+  echo "  ALIAS=<valor> (obligatorio)"
+  echo "  TARGETDIR=<Directorio destino de la copia>"
+  echo "  LOGFILE=<Archivo de log>"
+  echo "  INCOMING=<Carpeta de ficheros de imagen"
+  echo "  METAFILE=<fichero de metadatos generico para toda la copia>"
+  echo "  ANALYSIS_FILES=<Ficheros a analizar en el paso 5> (obligatorio)"
+  echo "3. Busqueda."
+  echo " Se muestran varios filtros de busqueda (FS, IMAGE, FILETYPE, ORPHAN ENTRIES)."
+  echo "4. Ver listado de fichero en \"incoming\""
+  echo " Muestra los ficheros de imagen que hay en la carpeta de INCOMING"
+  echo "5. Ejecutar analisis de ficheros segun fichero de config"
+  echo " Se muestran los ficheros con la etiqueta ANALYSIS_FILES y se les puede analizar"
+  echo " mostrando 1. Strings y 2. Valores hexa"
+  echo "6. Capturar resultado de una evidencia"
+  echo " Muestra un menu con los ficheros de imagen y el que elijas, te muestra su partition layout"
+  echo "7. Consultar estado de las importaciones y metadatos ya realizados"
+  echo " Muestra el listado de importaciones realizadas y cuandtos registros se han copiado, y"
+  echo " importaciones en curso, con el mismo resultado de registros importados / registros totales"
+  echo "0. Salir"
 }
 
 function show_menu() {
-#  clear
   echo "MENU"
   echo "1. Copiar datos"
   echo "2. Carga de fichero de configuracion"
