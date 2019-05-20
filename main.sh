@@ -8,9 +8,21 @@ ALIAS=""
 
 # Load library
 source ${BASEDIR}common.sh
+if [ $? -ne 0 ]; then
+  echo "ERROR: There was an error loading the library common.sh"
+  exit 1
+fi
 
+function help() {
+  # A short brief help to guide you throught the functionaly of this menu
+  echo "HELP"
+  echo "===="
+  echo
+  echo "The menu has 7 items
+}
 
 function show_menu() {
+#  clear
   echo "MENU"
   echo "1. Copiar datos"
   echo "2. Carga de fichero de configuracion"
@@ -38,14 +50,12 @@ function main() {
          option_picked "1. Copia de datos"
          if [ -z "$TARGETDIR" ]; then
            echo "Write the target directory of the copy: \(empty=cancel\)"
-           read targetdir
-         else
-           targetdir="$TARGETDIR"
+           read TARGETDIR
          fi
-         check_directory "$targetdir"
+         check_directory "$TARGETDIR"
          ls ${INCOMINGDIR}/*.E01 >/dev/null 2>&1
          if [ $? -eq 0 ]; then
-           copy_data_to "$targetdir"
+           copy_data_to &
          else
            echo "There is no EnCase file found in the \"incoming\" folder"
          fi
@@ -61,6 +71,7 @@ function main() {
 
       3) clear
          option_picked "3. Busqueda"
+         query_metadata_records
          show_menu
          ;;
 
@@ -72,6 +83,7 @@ function main() {
          
       5) clear
          option_picked "5. Ejecutar analisis de ficheros segun fichero de config"
+         run_analysis
          show_menu
          ;;
 
@@ -92,6 +104,7 @@ function main() {
 
       7) clear
          option_picked "7. Consultar estado de las importaciones y metadatos ya realizados"
+         find_imports
          show_menu
          ;;
 
@@ -100,7 +113,6 @@ function main() {
          ;;
 
       *) clear
-         echo "Erroneus option"
          show_menu
          ;;
 
@@ -113,6 +125,11 @@ function main() {
 # MAIN
 if [ ! -f $CONFIG_FILE ]; then
   touch $CONFIG_FILE
+fi
+
+if [ -n "$1" -a "$1" = "-h" ]; then
+  help
+  exit 1
 fi
 
 main
