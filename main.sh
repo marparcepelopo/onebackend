@@ -77,10 +77,22 @@ function main() {
            echo "Write the target directory of the copy: \(empty=cancel\)"
            read TARGETDIR
          fi
-         check_directory "$TARGETDIR"
+         
+         local CONT="no"
+         # Check the existance of an old metadatafile.dat
+         if [ -f "$TARGETDIR/metadatafile.dat" ]; then
+           echo "An old copy process was detected. Do you want to go on?"
+           are_you_sure
+           if [ $? -eq 1 ]; then
+             local CONT="continue"
+           else
+             check_directory "$TARGETDIR"
+           fi
+         fi
+
          ls ${INCOMINGDIR}/*.E01 >/dev/null 2>&1
          if [ $? -eq 0 ]; then
-           copy_data_to &
+           copy_data_to "$CONT" &
          else
            echo "There is no EnCase file found in the \"incoming\" folder"
          fi
@@ -134,6 +146,7 @@ function main() {
          ;;
 
       0) clear
+         pkill main.sh
          exit 1
          ;;
 

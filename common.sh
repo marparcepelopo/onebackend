@@ -170,14 +170,36 @@ function is_the_file_empty() {
   fi
 }
 
+function generate_insert() {
+  # Generate insert record
+  # param $1: complete line separated by pipes
+  if [ -z "$1" ]; then
+    log info "ERROR: function generate_insert: The parameter cannot be null"
+    return 1
+  fi
+  # $CASE|$ID|$ALIAS|$IMAGEFILE|$PARTID|$SECTORINI|$FS|$SIZE|$NOMBRE|$MD5|$CTIME|$COPYTIME|$EXT|$INODE
+  insert="$(echo "$1"|awk -F'|' '{print "INSERT INTO encase (case_name,alias_name,imagefile,partid,sectorini,fs,size,nombre,md5,ctime,copytime,ext,inode) values (\047$1\047,\047$3\047,\047$4\047,$5,$6,\047$7\047,$8,\047$9\047,\047$10\047,\047$11\047,\047$12\047,\047$13\047,\047$14\047);"}')"
+}
+
 function process_file_copy() {
   # Process the file image
   # param $1: An absolute path Image file name
+  # param $2: "continue" if and old copy process was detected
+  #           "" otherwise.
 
   # Create the dir with the image
   local IMAGEFILE="$1"
+  local CONTINUE="$2"
   local new_dir=${TARGETDIR}/${IMAGEFILE}
   mkdir $new_dir >/dev/null 2>&1
+
+  # Manage if the copy want to continued
+  if [ -n "$CONTINUE" -a "$CONTINUE" = "continue" ]; then
+    last_metadata_line="$(tail -1 ${TARGETDIR}/${METADATAFILE} | awk -F'|' '{OFS="|";print $2,$4,$6,$8,$9}')"
+    local CONT="yes"
+  else
+    local CONT="no"
+  fi
 
   # Get the partitions list
   mmls "$IMAGEFILE" | awk 'match($0, /NTFS|FAT[0-9][0-9]/) {
@@ -200,7 +222,9 @@ function process_file_copy() {
 
     log info "Creating the partition folder..."
     local new_part_dir=${new_dir}/$PARTID
-    mkdir -p $new_part_dir
+    if [ ! -d $new_part_dir ]; then
+      mkdir -p $new_part_dir
+    fi
 
     log info "Reading partition $PARTID..."
     local FILES_FORMAT="/tmp/files-${IMAGEFILE}-${PARTID}-${SECTORINI}-${FS}"
@@ -210,13 +234,13 @@ function process_file_copy() {
     fls $OPTIONS "$IMAGEFILE" -rpl | awk -F'\t' '{
       OFS="|"
       split($1, v, " ")
-      print v[1], substr(v[2],1,length(v[2])-1), $2, $6, $7, ++val
+      print v[1], substr(v[2],1,length(v[2])-1), $2, substr($6,1,length($6)-7), $7, ++val
       }' > $FILES_FORMAT
 
     is_the_file_empty $FILES_FORMAT
     if [ $? -ne 0 ]; then
       log debug "function process_file_copy: File \"$FILES_FORMAT\" was not dumped with files"
-      return 1
+       return 1
     fi
 
     # Reading the list of files and copying the content file to the $TARGETDIR variable
@@ -226,32 +250,39 @@ function process_file_copy() {
       local TYPE="$(echo $fileline | cut -d'|' -f1)"
       local INODE="$(echo $fileline | cut -d'|' -f2)"
       local NOMBRE="$(echo $fileline | cut -d'|' -f3)"
-      local CTIME="$(echo $fileline | cut -d'|' -f4)"
+      local CTIME="$(echo $fileline | cut -d'|' -f4 | sed 's/ \(CET\)//')"
       local SIZE="$(echo $fileline | cut -d'|' -f5)"
       local NUMLINE="$(echo $fileline | cut -d'|' -f6)"
-
-      # If the entry belongs to an Orphan element (with no inode), we only add it to metadata file
-      if [ -n "$INODE" ]; then
-        if [[ "$TYPE" =~ "d" ]]; then
-          mkdir "${new_part_dir}/${NOMBRE}" -p
-        else
-          (time icat $OPTIONS "$IMAGEFILE" $INODE) > "${new_part_dir}/${NOMBRE}" 2>/tmp/timeres
-          local COPYTIME="$(awk '/real/ {print $2}' /tmp/timeres)"
-          local MD5="$(icat $OPTIONS "$IMAGEFILE" $INODE|md5sum|awk '{print $1}')"
-
-          # Checking integrity with md5sum between the origin (image file) and the target file
-          if [ "$MD5" != "`cat "${new_part_dir}/${NOMBRE}"|md5sum|awk '{print $1}'`" ]; then
-            log debug "The copy of the file \"${NOMBRE}\" did not passed the integrity check"
-          fi
+      if [ "$CONT" = "yes" ]; then
+        cur_line="$ID|$IMAGEFILE|$SECTORINI|$SIZE|$NOMBRE"
+        if [ "$last_metadata_line" = "$cur_line" ]; then
+          # if the last line of matadata file is reached, the current line will be ommitted
+          # but the next loop, it will get in and process de file
+          CONT="no"
         fi
-      fi
-      #local EXT="$(echo "$NOMBRE" | awk '{split($0, arr, "."); for (i in arr){val++}; print arr[val]}')"
-      local EXT="$TYPE"
+      else
+        # If the entry belongs to an Orphan element (with no inode), we only add it to metadata file
+        if [ -n "$INODE" ]; then
+          if [[ "$TYPE" =~ "d" ]]; then
+            mkdir "${new_part_dir}/${NOMBRE}" -p
+          else
+            (/usr/bin/time -f "%E" icat $OPTIONS "$IMAGEFILE" $INODE) > "${new_part_dir}/${NOMBRE}" 2>/tmp/timeres
+            local COPYTIME="$(cat /tmp/timeres)"
+            local MD5="$(icat $OPTIONS "$IMAGEFILE" $INODE|md5sum|awk '{print $1}')"
+  
+            # Checking integrity with md5sum between the origin (image file) and the target file
+            if [ "$MD5" != "`cat "${new_part_dir}/${NOMBRE}"|md5sum|awk '{print $1}'`" ]; then
+              log debug "The copy of the file \"${NOMBRE}\" did not passed the integrity check"
+            fi
+          fi # TYPE =~ d
+        fi # -n INODE
+        # local EXT="$(echo "$NOMBRE" | awk '{split($0, arr, "."); for (i in arr){val++}; print arr[val]}')"
+        local EXT="$TYPE"
 
-      echo "$CASE|$ID|$ALIAS|$IMAGEFILE|$PARTID|$SECTORINI|$FS|$SIZE|$NOMBRE|$MD5|$CTIME|$COPYTIME|$EXT|$INODE" >>  ${TARGETDIR}/${METADATAFILE}
-
-      # Keep after every line loaded the track of where I am working
-      echo "$FILES_FORMAT|$NUMLINE" > $CURRENT_POINTER_FILE
+        result="$CASE|$ID|$ALIAS|$IMAGEFILE|$PARTID|$SECTORINI|$FS|$SIZE|$NOMBRE|$MD5|$CTIME|$COPYTIME|$EXT|$INODE"
+        echo $result >> ${TARGETDIR}/${METADATAFILE}
+        
+      fi # CONT = yes
 
       ID=$(($ID+1))
     done < $FILES_FORMAT
@@ -259,14 +290,21 @@ function process_file_copy() {
 }
 
 function copy_data_to() {
+  # Master of the copy process
+  # param $1: "continue" if the copy want to be continued, "" otherwise.
+
   # List the image files
   pushd "${INCOMINGDIR}" >/dev/null
 
-  log info "Create data file in ${TARGETDIR}/${METADATAFILE}"
-  echo "CASE|ID|ALIAS|IMAGEFILE|PARTID|SECTORINI|FS|SIZE|FILENAME|MD5|CTIME|COPYTIME|EXT|INODE" > ${TARGETDIR}/${METADATAFILE}
+  # Write only if the process wants to be continued
+  if [ -z "$1" ]; then
+    log info "Create data file in ${TARGETDIR}/${METADATAFILE}"
+    echo "CASE_NAME|ID|ALIAS_NAME|IMAGEFILE|PARTID|SECTORINI|FS|SIZE|FILENAME|MD5|CTIME|COPYTIME|EXT|INODE" > ${TARGETDIR}/${METADATAFILE}
+  fi
+
   for f in `ls *.E01`
   do
-    process_file_copy "$f"
+    process_file_copy "$f" "$1"
     if [ $? -eq 0 ]; then
       log debug "function copy_data_to: Image file \"$f\" processed succesfully"
     else
